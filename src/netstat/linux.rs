@@ -31,6 +31,9 @@ impl NetStat for LinuxNetStat {
         let mut mapping = HashMap::new();
         for pid in pids {
             let pid_path = self.proc_path.join(pid.to_string());
+            let Ok(inodes) = get_socket_inodes(&pid_path) else {
+                continue;
+            };
             for connection in connections {
                 let socket_filename = match connection {
                     Connections::TCP => "tcp",
@@ -41,7 +44,7 @@ impl NetStat for LinuxNetStat {
                 };
                 let socket_table_file = pid_path.join("net").join(socket_filename);
 
-                get_ports_for_pid(&pid_path, &socket_table_file)
+                get_ports_for_pid(&socket_table_file, &inodes)
                     .unwrap_or_default()
                     .into_iter()
                     .for_each(|addr| {
@@ -54,7 +57,7 @@ impl NetStat for LinuxNetStat {
     }
 }
 
-fn get_ports_for_pid(pid_path: &Path, socket_table_file: &Path) -> io::Result<Vec<IpAddr>> {
+fn get_socket_inodes(pid_path: &Path) -> io::Result<HashSet<String>> {
     let socket_regex = Regex::new(r"^socket:\[(?<inode>\d+)\]$").unwrap();
     let inodes: HashSet<String> = fs::read_dir(pid_path.join("fd"))?
         .filter_map(|fd| fd.ok())
@@ -65,7 +68,13 @@ fn get_ports_for_pid(pid_path: &Path, socket_table_file: &Path) -> io::Result<Ve
             Some(caps["inode"].to_owned())
         })
         .collect();
+    Ok(inodes)
+}
 
+fn get_ports_for_pid(
+    socket_table_file: &Path,
+    inodes: &HashSet<String>,
+) -> io::Result<Vec<IpAddr>> {
     let file = File::open(socket_table_file)?;
     let mut reader = BufReader::new(file);
     let mut line = String::new();
@@ -74,6 +83,7 @@ fn get_ports_for_pid(pid_path: &Path, socket_table_file: &Path) -> io::Result<Ve
     reader.read_line(&mut line)?;
     line.clear();
 
+    let table_line = Regex::new(r"^$").unwrap();
     while let n = reader.read_line(&mut line)?
         && n > 0
     {
