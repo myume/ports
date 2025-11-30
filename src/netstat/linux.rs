@@ -1,6 +1,7 @@
 use std::{
     collections::{HashMap, HashSet},
-    fs, io,
+    fs::{self, File},
+    io::{self, BufRead, BufReader},
     net::IpAddr,
     path::{Path, PathBuf},
 };
@@ -29,19 +30,31 @@ impl NetStat for LinuxNetStat {
 
         let mut mapping = HashMap::new();
         for pid in pids {
-            get_ports_for_pid(&self.proc_path.join(pid.to_string()))
-                .unwrap_or_default()
-                .into_iter()
-                .for_each(|addr| {
-                    mapping.insert(pid, addr);
-                });
+            let pid_path = self.proc_path.join(pid.to_string());
+            for connection in connections {
+                let socket_filename = match connection {
+                    Connections::TCP => "tcp",
+                    Connections::TCPv6 => "tcp6",
+                    Connections::UDP => "udp",
+                    Connections::UDPv6 => "udp6",
+                    _ => unreachable!(),
+                };
+                let socket_table_file = pid_path.join("net").join(socket_filename);
+
+                get_ports_for_pid(&pid_path, &socket_table_file)
+                    .unwrap_or_default()
+                    .into_iter()
+                    .for_each(|addr| {
+                        mapping.insert(pid, addr);
+                    });
+            }
         }
 
         Ok(mapping)
     }
 }
 
-fn get_ports_for_pid(pid_path: &Path) -> io::Result<Vec<IpAddr>> {
+fn get_ports_for_pid(pid_path: &Path, socket_table_file: &Path) -> io::Result<Vec<IpAddr>> {
     let socket_regex = Regex::new(r"^socket:\[(?<inode>\d+)\]$").unwrap();
     let inodes: HashSet<String> = fs::read_dir(pid_path.join("fd"))?
         .filter_map(|fd| fd.ok())
@@ -53,5 +66,19 @@ fn get_ports_for_pid(pid_path: &Path) -> io::Result<Vec<IpAddr>> {
         })
         .collect();
 
-    Ok(vec![])
+    let file = File::open(socket_table_file)?;
+    let mut reader = BufReader::new(file);
+    let mut line = String::new();
+
+    // read one line to remove the header
+    reader.read_line(&mut line)?;
+    line.clear();
+
+    while let n = reader.read_line(&mut line)?
+        && n > 0
+    {
+        println!("{} {line}", socket_table_file.display());
+        line.clear();
+    }
+    todo!()
 }
