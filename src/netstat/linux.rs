@@ -7,7 +7,7 @@ use std::{
 
 use regex::Regex;
 
-use crate::netstat::{NetStat, PID};
+use crate::netstat::{Connections, NetStat, PID};
 
 pub struct LinuxNetStat {
     proc_path: PathBuf,
@@ -22,7 +22,7 @@ impl LinuxNetStat {
 }
 
 impl NetStat for LinuxNetStat {
-    fn get_ports(&self) -> io::Result<HashMap<PID, IpAddr>> {
+    fn get_ports(&self, connections: Connections) -> io::Result<HashMap<PID, IpAddr>> {
         let pids = fs::read_dir(&self.proc_path)?
             .filter_map(|entry| entry.ok())
             .filter_map(|entry| entry.file_name().to_string_lossy().parse::<PID>().ok());
