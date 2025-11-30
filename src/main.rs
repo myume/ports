@@ -1,3 +1,7 @@
+use ports::netstat::get_netstat_impl;
+
 fn main() {
-    println!("Hello, world!");
+    let netstat = get_netstat_impl();
+
+    println!("{:?}", netstat.get_ports());
 }
