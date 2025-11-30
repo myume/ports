@@ -27,4 +27,10 @@ result-*
 
 # Ignore automatically generated direnv output
 .direnv
+.envrc
 
+
+
+# Added by cargo
+
+/target
