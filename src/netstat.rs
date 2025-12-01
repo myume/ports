@@ -11,18 +11,18 @@ bitflags! {
     #[derive(Copy, Clone, Debug, Eq, PartialEq)]
     pub struct Connections: u8 {
         const TCP = 1 << 0;
-        const TCPv6 = 1 << 1;
+        // const TCPv6 = 1 << 1;
         const UDP = 1 << 2;
-        const UDPv6 = 1 << 3;
+        // const UDPv6 = 1 << 3;
     }
 }
 
 #[derive(Debug)]
 pub struct NetStatEntry {
-    exe: String,
-    local_addr: SocketAddr,
-    remote_addr: SocketAddr,
-    proto: Connections,
+    pub exe: String,
+    pub local_addr: SocketAddr,
+    pub remote_addr: SocketAddr,
+    pub proto: Connections,
 }
 
 pub trait NetStat {

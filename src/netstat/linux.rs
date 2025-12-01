@@ -41,9 +41,9 @@ impl NetStat for LinuxNetStat {
             for connection in connections {
                 let socket_filename = match connection {
                     Connections::TCP => "tcp",
-                    Connections::TCPv6 => "tcp6",
+                    // Connections::TCPv6 => "tcp6",
                     Connections::UDP => "udp",
-                    Connections::UDPv6 => "udp6",
+                    // Connections::UDPv6 => "udp6",
                     _ => unreachable!(),
                 };
                 let socket_table_file = pid_path.join("net").join(socket_filename);
