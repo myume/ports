@@ -128,20 +128,21 @@ fn get_ports_for_pid(
     Ok(addrs)
 }
 
+// the address is hex in BE format
 fn hex_addr_to_ipv4_string(address: &str, port: &str) -> String {
     assert_eq!(address.len(), 8);
     assert_eq!(port.len(), 4);
 
     let mut s = String::new();
 
-    for i in (0..address.len()).step_by(2) {
+    for i in (0..address.len()).step_by(2).rev() {
         let hex = &address[i..i + 2];
         s.push_str(
             &u8::from_str_radix(hex, 16)
                 .expect("Should be valid hex")
                 .to_string(),
         );
-        if i < address.len() - 2 {
+        if i > 0 {
             s.push('.');
         }
     }
@@ -162,11 +163,11 @@ mod test {
 
     #[test]
     fn test_hex_to_ip_string() {
-        let hex_addr = "7f000001"; // 127.0.0.1
-        let hex_port = "0bb8"; // 3000
+        let hex_addr = "0100007F"; // 127.0.0.1
+        let hex_port = "1F90"; // 8080
         assert_eq!(
             hex_addr_to_ipv4_string(hex_addr, hex_port),
-            "127.0.0.1:3000"
+            "127.0.0.1:8080"
         );
     }
 }
