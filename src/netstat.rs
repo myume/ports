@@ -17,8 +17,16 @@ bitflags! {
     }
 }
 
+#[derive(Debug)]
+pub struct NetStatEntry {
+    exe: String,
+    local_addr: SocketAddr,
+    remote_addr: SocketAddr,
+    proto: Connections,
+}
+
 pub trait NetStat {
-    fn get_ports(&self, connections: Connections) -> io::Result<HashMap<PID, SocketAddr>>;
+    fn get_ports(&self, connections: Connections) -> io::Result<HashMap<PID, NetStatEntry>>;
 }
 
 pub fn get_netstat_impl() -> Box<dyn NetStat> {

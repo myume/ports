@@ -9,7 +9,7 @@ use std::{
 
 use regex::Regex;
 
-use crate::netstat::{Connections, NetStat, PID};
+use crate::netstat::{Connections, NetStat, NetStatEntry, PID};
 
 pub struct LinuxNetStat {
     proc_path: PathBuf,
@@ -24,7 +24,7 @@ impl LinuxNetStat {
 }
 
 impl NetStat for LinuxNetStat {
-    fn get_ports(&self, connections: Connections) -> io::Result<HashMap<PID, SocketAddr>> {
+    fn get_ports(&self, connections: Connections) -> io::Result<HashMap<PID, NetStatEntry>> {
         let pids = fs::read_dir(&self.proc_path)?
             .filter_map(|entry| entry.ok())
             .filter_map(|entry| entry.file_name().to_string_lossy().parse::<PID>().ok());
@@ -35,6 +35,9 @@ impl NetStat for LinuxNetStat {
             let Ok(inodes) = get_socket_inodes(&pid_path) else {
                 continue;
             };
+            let exe = fs::read_link(pid_path.join("exe"))
+                .map(|exe| exe.display().to_string())
+                .unwrap_or_default();
             for connection in connections {
                 let socket_filename = match connection {
                     Connections::TCP => "tcp",
@@ -48,8 +51,16 @@ impl NetStat for LinuxNetStat {
                 get_ports_for_pid(&socket_table_file, &inodes)
                     .unwrap_or_default()
                     .into_iter()
-                    .for_each(|addr| {
-                        mapping.insert(pid, addr);
+                    .for_each(|(local_addr, remote_addr)| {
+                        mapping.insert(
+                            pid,
+                            NetStatEntry {
+                                exe: exe.clone(),
+                                local_addr,
+                                remote_addr,
+                                proto: connection,
+                            },
+                        );
                     });
             }
         }
@@ -75,7 +86,7 @@ fn get_socket_inodes(pid_path: &Path) -> io::Result<HashSet<String>> {
 fn get_ports_for_pid(
     socket_table_file: &Path,
     inodes: &HashSet<String>,
-) -> io::Result<Vec<SocketAddr>> {
+) -> io::Result<Vec<(SocketAddr, SocketAddr)>> {
     let file = File::open(socket_table_file)?;
     let mut reader = BufReader::new(file);
     let mut line = String::new();
@@ -120,8 +131,13 @@ fn get_ports_for_pid(
         };
 
         if inodes.contains(&caps["inode_number"]) {
-            let addr_str = hex_addr_to_ipv4_string(&caps["local_address"], &caps["local_port"]);
-            addrs.push(SocketAddr::from_str(&addr_str).expect("Invalid Address"));
+            let local_addr = hex_addr_to_ipv4_string(&caps["local_address"], &caps["local_port"]);
+            let remote_addr =
+                hex_addr_to_ipv4_string(&caps["remote_address"], &caps["remote_port"]);
+            addrs.push((
+                SocketAddr::from_str(&local_addr).expect("Invalid Local Address"),
+                SocketAddr::from_str(&remote_addr).expect("Invalid Remote Address"),
+            ));
         };
         line.clear();
     }
