@@ -2,8 +2,9 @@ use std::{
     collections::{HashMap, HashSet},
     fs::{self, File},
     io::{self, BufRead, BufReader},
-    net::IpAddr,
+    net::SocketAddr,
     path::{Path, PathBuf},
+    str::FromStr,
 };
 
 use regex::Regex;
@@ -23,7 +24,7 @@ impl LinuxNetStat {
 }
 
 impl NetStat for LinuxNetStat {
-    fn get_ports(&self, connections: Connections) -> io::Result<HashMap<PID, IpAddr>> {
+    fn get_ports(&self, connections: Connections) -> io::Result<HashMap<PID, SocketAddr>> {
         let pids = fs::read_dir(&self.proc_path)?
             .filter_map(|entry| entry.ok())
             .filter_map(|entry| entry.file_name().to_string_lossy().parse::<PID>().ok());
@@ -74,7 +75,7 @@ fn get_socket_inodes(pid_path: &Path) -> io::Result<HashSet<String>> {
 fn get_ports_for_pid(
     socket_table_file: &Path,
     inodes: &HashSet<String>,
-) -> io::Result<Vec<IpAddr>> {
+) -> io::Result<Vec<SocketAddr>> {
     let file = File::open(socket_table_file)?;
     let mut reader = BufReader::new(file);
     let mut line = String::new();
@@ -83,12 +84,89 @@ fn get_ports_for_pid(
     reader.read_line(&mut line)?;
     line.clear();
 
-    let table_line = Regex::new(r"^$").unwrap();
+    // sl local_address rem_address st tx_queue rx_queue tr tm->when retrnsmt uid timeout inode
+    let table_line = Regex::new(
+        r"(?x)
+        ^\s*
+        (\d*):
+        \s*
+        (?<local_address>[A-F0-9]+):(?<local_port>[A-F0-9]{4})
+        \s*
+        (?<remote_address>[A-F0-9]+):(?<remote_port>[A-F0-9]{4})
+        \s*
+        (?<state>[A-F0-9]{2})
+        \s*
+        [A-F0-9:]+
+        \s*
+        [A-F0-9:]+
+        \s*
+        [A-F0-9]+
+        \s*
+        [A-F0-9]+
+        \s*
+        [A-F0-9]+
+        \s*
+        (?<inode_number>\d+)
+        ",
+    )
+    .unwrap();
+    let mut addrs = Vec::new();
     while let n = reader.read_line(&mut line)?
         && n > 0
     {
-        println!("{} {line}", socket_table_file.display());
+        let Some(caps) = table_line.captures(&line) else {
+            line.clear();
+            continue;
+        };
+
+        if inodes.contains(&caps["inode_number"]) {
+            let addr_str = hex_addr_to_ipv4_string(&caps["local_address"], &caps["local_port"]);
+            addrs.push(SocketAddr::from_str(&addr_str).expect("Invalid Address"));
+        };
         line.clear();
     }
-    todo!()
+    Ok(addrs)
+}
+
+fn hex_addr_to_ipv4_string(address: &str, port: &str) -> String {
+    assert_eq!(address.len(), 8);
+    assert_eq!(port.len(), 4);
+
+    let mut s = String::new();
+
+    for i in (0..address.len()).step_by(2) {
+        let hex = &address[i..i + 2];
+        s.push_str(
+            &u8::from_str_radix(hex, 16)
+                .expect("Should be valid hex")
+                .to_string(),
+        );
+        if i < address.len() - 2 {
+            s.push('.');
+        }
+    }
+
+    s.push(':');
+    s.push_str(
+        &u32::from_str_radix(port, 16)
+            .expect("Port is invalid")
+            .to_string(),
+    );
+
+    s
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_hex_to_ip_string() {
+        let hex_addr = "7f000001"; // 127.0.0.1
+        let hex_port = "0bb8"; // 3000
+        assert_eq!(
+            hex_addr_to_ipv4_string(hex_addr, hex_port),
+            "127.0.0.1:3000"
+        );
+    }
 }

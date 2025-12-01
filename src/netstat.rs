@@ -1,5 +1,5 @@
 use bitflags::bitflags;
-use std::{collections::HashMap, env, io, net::IpAddr};
+use std::{collections::HashMap, env, io, net::SocketAddr};
 
 use crate::netstat::linux::LinuxNetStat;
 
@@ -18,7 +18,7 @@ bitflags! {
 }
 
 pub trait NetStat {
-    fn get_ports(&self, connections: Connections) -> io::Result<HashMap<PID, IpAddr>>;
+    fn get_ports(&self, connections: Connections) -> io::Result<HashMap<PID, SocketAddr>>;
 }
 
 pub fn get_netstat_impl() -> Box<dyn NetStat> {
