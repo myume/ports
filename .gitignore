@@ -34,3 +34,7 @@ result-*
 # Added by cargo
 
 /target
+
+# Perfomance
+perf.*
+flamegraph.*

@@ -30,9 +30,37 @@ impl NetStat for LinuxNetStat {
             .filter_map(|entry| entry.file_name().to_string_lossy().parse::<PID>().ok());
 
         let mut mapping = HashMap::new();
+        // sl local_address rem_address st tx_queue rx_queue tr tm->when retrnsmt uid timeout inode
+        let table_line = Regex::new(
+            r"(?x)
+            ^\s*
+            (\d*):
+            \s*
+            (?<local_address>[A-F0-9]+):(?<local_port>[A-F0-9]{4})
+            \s*
+            (?<remote_address>[A-F0-9]+):(?<remote_port>[A-F0-9]{4})
+            \s*
+            (?<state>[A-F0-9]{2})
+            \s*
+            [A-F0-9:]+
+            \s*
+            [A-F0-9:]+
+            \s*
+            [A-F0-9]+
+            \s*
+            [A-F0-9]+
+            \s*
+            [A-F0-9]+
+            \s*
+            (?<inode_number>\d+)
+            ",
+        )
+        .unwrap();
+        let socket_regex = Regex::new(r"^socket:\[(?<inode>\d+)\]$").unwrap();
+
         for pid in pids {
             let pid_path = self.proc_path.join(pid.to_string());
-            let Ok(inodes) = get_socket_inodes(&pid_path) else {
+            let Ok(inodes) = get_socket_inodes(&pid_path, &socket_regex) else {
                 continue;
             };
             let exe = fs::read_link(pid_path.join("exe"))
@@ -48,7 +76,7 @@ impl NetStat for LinuxNetStat {
                 };
                 let socket_table_file = pid_path.join("net").join(socket_filename);
 
-                get_ports_for_pid(&socket_table_file, &inodes)
+                get_ports_for_pid(&socket_table_file, &inodes, &table_line)
                     .unwrap_or_default()
                     .into_iter()
                     .for_each(|(local_addr, remote_addr)| {
@@ -69,8 +97,7 @@ impl NetStat for LinuxNetStat {
     }
 }
 
-fn get_socket_inodes(pid_path: &Path) -> io::Result<HashSet<String>> {
-    let socket_regex = Regex::new(r"^socket:\[(?<inode>\d+)\]$").unwrap();
+fn get_socket_inodes(pid_path: &Path, socket_regex: &Regex) -> io::Result<HashSet<String>> {
     let inodes: HashSet<String> = fs::read_dir(pid_path.join("fd"))?
         .filter_map(|fd| fd.ok())
         .filter_map(|fd| fs::read_link(fd.path()).ok())
@@ -86,6 +113,7 @@ fn get_socket_inodes(pid_path: &Path) -> io::Result<HashSet<String>> {
 fn get_ports_for_pid(
     socket_table_file: &Path,
     inodes: &HashSet<String>,
+    table_line: &Regex,
 ) -> io::Result<Vec<(SocketAddr, SocketAddr)>> {
     let file = File::open(socket_table_file)?;
     let mut reader = BufReader::new(file);
@@ -95,32 +123,6 @@ fn get_ports_for_pid(
     reader.read_line(&mut line)?;
     line.clear();
 
-    // sl local_address rem_address st tx_queue rx_queue tr tm->when retrnsmt uid timeout inode
-    let table_line = Regex::new(
-        r"(?x)
-        ^\s*
-        (\d*):
-        \s*
-        (?<local_address>[A-F0-9]+):(?<local_port>[A-F0-9]{4})
-        \s*
-        (?<remote_address>[A-F0-9]+):(?<remote_port>[A-F0-9]{4})
-        \s*
-        (?<state>[A-F0-9]{2})
-        \s*
-        [A-F0-9:]+
-        \s*
-        [A-F0-9:]+
-        \s*
-        [A-F0-9]+
-        \s*
-        [A-F0-9]+
-        \s*
-        [A-F0-9]+
-        \s*
-        (?<inode_number>\d+)
-        ",
-    )
-    .unwrap();
     let mut addrs = Vec::new();
     while let n = reader.read_line(&mut line)?
         && n > 0
