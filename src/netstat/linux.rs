@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashSet,
     fs::{self, File},
     io::{self, BufRead, BufReader},
     net::SocketAddr,
@@ -24,12 +24,12 @@ impl LinuxNetStat {
 }
 
 impl NetStat for LinuxNetStat {
-    fn get_ports(&self, connections: Protocol) -> io::Result<HashMap<PID, NetStatEntry>> {
+    fn get_ports(&self, protos: &Protocol) -> io::Result<Vec<NetStatEntry>> {
         let pids = fs::read_dir(&self.proc_path)?
             .filter_map(|entry| entry.ok())
             .filter_map(|entry| entry.file_name().to_string_lossy().parse::<PID>().ok());
 
-        let mut mapping = HashMap::new();
+        let mut ports = Vec::new();
         // sl local_address rem_address st tx_queue rx_queue tr tm->when retrnsmt uid timeout inode
         let table_line = Regex::new(
             r"(?x)
@@ -66,7 +66,7 @@ impl NetStat for LinuxNetStat {
             let exe = fs::read_link(pid_path.join("exe"))
                 .map(|exe| exe.display().to_string())
                 .unwrap_or_default();
-            for connection in connections {
+            for connection in *protos {
                 let socket_filename = connection.to_string();
                 let socket_table_file = pid_path.join("net").join(socket_filename);
 
@@ -74,21 +74,18 @@ impl NetStat for LinuxNetStat {
                     .unwrap_or_default()
                     .into_iter()
                     .for_each(|(local_addr, remote_addr)| {
-                        mapping.insert(
+                        ports.push(NetStatEntry {
+                            exe: exe.clone(),
                             pid,
-                            NetStatEntry {
-                                exe: exe.clone(),
-                                pid,
-                                local_addr,
-                                remote_addr,
-                                proto: connection,
-                            },
-                        );
+                            local_addr,
+                            remote_addr,
+                            proto: connection,
+                        });
                     });
             }
         }
 
-        Ok(mapping)
+        Ok(ports)
     }
 }
 

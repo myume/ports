@@ -1,12 +1,12 @@
 use bitflags::bitflags;
-use std::{collections::HashMap, env, fmt::Display, io, net::SocketAddr, str::FromStr};
+use std::{env, fmt::Display, io, net::SocketAddr, str::FromStr};
 use tabled::Tabled;
 
 use crate::netstat::linux::LinuxNetStat;
 
 mod linux;
 
-pub type PID = u32;
+pub type PID = usize;
 
 bitflags! {
     #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -58,7 +58,7 @@ pub struct NetStatEntry {
 }
 
 pub trait NetStat {
-    fn get_ports(&self, connections: Protocol) -> io::Result<HashMap<PID, NetStatEntry>>;
+    fn get_ports(&self, protos: &Protocol) -> io::Result<Vec<NetStatEntry>>;
 }
 
 pub fn get_netstat_impl() -> Box<dyn NetStat> {
