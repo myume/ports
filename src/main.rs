@@ -17,7 +17,8 @@ fn main() {
 
     let netstat = get_netstat_impl();
 
-    if let Ok(port_mapping) = netstat.get_ports(args.proto) {
-        println!("{:#?}", port_mapping);
+    match netstat.get_ports(args.proto) {
+        Ok(mapping) => println!("{:#?}", mapping),
+        Err(e) => eprintln!("Failed to get ports: {e}"),
     }
 }
