@@ -1,5 +1,6 @@
 use clap::{Parser, command};
-use ports::netstat::{Protocol, get_netstat_impl};
+use ports::netstat::{NetStatEntry, Protocol, get_netstat_impl, truncate_path};
+use tabled::Table;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -18,7 +19,17 @@ fn main() {
     let netstat = get_netstat_impl();
 
     match netstat.get_ports(args.proto) {
-        Ok(mapping) => println!("{:#?}", mapping),
+        Ok(mapping) => {
+            let ports = mapping
+                .into_values()
+                .map(|mut port| {
+                    port.exe = format!("...{}", truncate_path(&port.exe, 32));
+                    port
+                })
+                .collect::<Vec<NetStatEntry>>();
+            let table = Table::new(ports);
+            println!("{table}");
+        }
         Err(e) => eprintln!("Failed to get ports: {e}"),
     }
 }

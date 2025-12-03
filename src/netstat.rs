@@ -1,5 +1,6 @@
 use bitflags::bitflags;
 use std::{collections::HashMap, env, fmt::Display, io, net::SocketAddr, str::FromStr};
+use tabled::Tabled;
 
 use crate::netstat::linux::LinuxNetStat;
 
@@ -47,7 +48,7 @@ impl Display for Protocol {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Tabled)]
 pub struct NetStatEntry {
     pub exe: String,
     pub local_addr: SocketAddr,
@@ -65,4 +66,12 @@ pub fn get_netstat_impl() -> Box<dyn NetStat> {
         _ => todo!("Not Yet Supported"),
     };
     Box::new(instance)
+}
+
+pub fn truncate_path(s: &str, limit: usize) -> String {
+    let start = s[s.len() - limit..]
+        .find("/")
+        .map(|i| s.len() - limit + i + 1)
+        .unwrap_or(s.len() - limit);
+    s[start..].to_owned()
 }
