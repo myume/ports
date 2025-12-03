@@ -9,7 +9,7 @@ use std::{
 
 use regex::Regex;
 
-use crate::netstat::{Connections, NetStat, NetStatEntry, PID};
+use crate::netstat::{NetStat, NetStatEntry, PID, Protocol};
 
 pub struct LinuxNetStat {
     proc_path: PathBuf,
@@ -24,7 +24,7 @@ impl LinuxNetStat {
 }
 
 impl NetStat for LinuxNetStat {
-    fn get_ports(&self, connections: Connections) -> io::Result<HashMap<PID, NetStatEntry>> {
+    fn get_ports(&self, connections: Protocol) -> io::Result<HashMap<PID, NetStatEntry>> {
         let pids = fs::read_dir(&self.proc_path)?
             .filter_map(|entry| entry.ok())
             .filter_map(|entry| entry.file_name().to_string_lossy().parse::<PID>().ok());
@@ -67,13 +67,7 @@ impl NetStat for LinuxNetStat {
                 .map(|exe| exe.display().to_string())
                 .unwrap_or_default();
             for connection in connections {
-                let socket_filename = match connection {
-                    Connections::TCP => "tcp",
-                    // Connections::TCPv6 => "tcp6",
-                    Connections::UDP => "udp",
-                    // Connections::UDPv6 => "udp6",
-                    _ => unreachable!(),
-                };
+                let socket_filename = connection.to_string();
                 let socket_table_file = pid_path.join("net").join(socket_filename);
 
                 get_ports_for_pid(&socket_table_file, &inodes, &table_line)

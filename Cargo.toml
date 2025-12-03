@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 bitflags = "2.10.0"
+clap = { version = "4.5.53", features = ["derive"] }
 regex = "1.12.2"
 
 [profile.release]
