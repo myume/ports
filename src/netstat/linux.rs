@@ -78,6 +78,7 @@ impl NetStat for LinuxNetStat {
                             pid,
                             NetStatEntry {
                                 exe: exe.clone(),
+                                pid,
                                 local_addr,
                                 remote_addr,
                                 proto: connection,

@@ -51,6 +51,7 @@ impl Display for Protocol {
 #[derive(Debug, Tabled)]
 pub struct NetStatEntry {
     pub exe: String,
+    pub pid: PID,
     pub local_addr: SocketAddr,
     pub remote_addr: SocketAddr,
     pub proto: Protocol,
