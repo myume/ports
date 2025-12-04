@@ -10,6 +10,11 @@
     forEachSystem = nixpkgs.lib.genAttrs systems;
     pkgsForEach = nixpkgs.legacyPackages;
   in {
+    packages = forEachSystem (system: {
+      ports = pkgsForEach.${system}.callPackage ./nix/package.nix {};
+      default = self.packages.${system}.ports;
+    });
+
     devShells = forEachSystem (system: {
       default = pkgsForEach.${system}.callPackage ./nix/shell.nix {};
     });
