@@ -103,8 +103,8 @@ impl Tui {
         [
             Constraint::Length(38),
             Constraint::Min(7),
-            Constraint::Min(19),
-            Constraint::Min(19),
+            Constraint::Min(22),
+            Constraint::Min(22),
             Constraint::Length(8),
         ]
     }
