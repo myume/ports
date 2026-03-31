@@ -23,7 +23,8 @@ enum Commands {
     Tui,
 }
 
-fn main() -> io::Result<()> {
+#[tokio::main]
+async fn main() -> io::Result<()> {
     let args = Args::parse();
 
     let netstat = get_netstat_impl();
@@ -32,13 +33,14 @@ fn main() -> io::Result<()> {
         Some(Commands::Tui) => {
             let mut tui = tui::Tui::new(netstat, args.proto);
             let mut terminal = ratatui::init();
-            let app_result = tui.run(&mut terminal);
+            let app_result = tui.run(&mut terminal).await;
             ratatui::restore();
             app_result
         }
         None => {
             let ports: Vec<NetStatEntry> = netstat
-                .get_ports(&args.proto)?
+                .get_ports(&args.proto)
+                .await?
                 .into_iter()
                 .map(|mut port| {
                     port.exe = format!("...{}", truncate_path(&port.exe, 32));

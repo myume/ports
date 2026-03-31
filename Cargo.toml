@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+async-trait = "0.1.89"
 bitflags = "2.10.0"
 clap = { version = "4.5.53", features = ["derive"] }
 color-eyre = "0.6.3"
@@ -12,6 +13,7 @@ ratatui = "0.29.0"
 regex = "1.12.2"
 sysinfo = "0.37.2"
 tabled = "0.20.0"
+tokio = { version = "1.50.0", features = ["full"] }
 
 [profile.release]
 debug = true

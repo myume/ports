@@ -33,11 +33,11 @@ impl Tui {
         }
     }
 
-    pub fn run(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
-        self.refresh_ports()?;
+    pub async fn run(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
+        self.refresh_ports().await?;
         while !self.exit {
             terminal.draw(|frame| self.draw(frame))?;
-            self.handle_events()?;
+            self.handle_events().await?;
         }
         Ok(())
     }
@@ -141,17 +141,17 @@ impl Tui {
         frame.render_widget(table, area.inner(Margin::new(1, 1)));
     }
 
-    fn handle_events(&mut self) -> io::Result<()> {
+    async fn handle_events(&mut self) -> io::Result<()> {
         match event::read()? {
             Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
-                self.handle_key_event(key_event)?
+                self.handle_key_event(key_event).await?
             }
             _ => {}
         };
         Ok(())
     }
 
-    fn handle_key_event(&mut self, key_event: event::KeyEvent) -> io::Result<()> {
+    async fn handle_key_event(&mut self, key_event: event::KeyEvent) -> io::Result<()> {
         match key_event.code {
             KeyCode::Char('q') => self.exit(),
             KeyCode::Char('c') => {
@@ -162,7 +162,7 @@ impl Tui {
 
             KeyCode::Char('r') => {
                 if !self.confirm {
-                    self.refresh_ports()?;
+                    self.refresh_ports().await?;
                 }
             }
 
@@ -190,14 +190,14 @@ impl Tui {
 
             KeyCode::Enter => {
                 if self.confirm {
-                    self.kill_selected()?;
+                    self.kill_selected().await?;
                 } else {
                     self.confirm = true;
                 }
             }
             KeyCode::Char('y') => {
                 if self.confirm {
-                    self.kill_selected()?;
+                    self.kill_selected().await?;
                 }
             }
             KeyCode::Char('n') => {
@@ -209,7 +209,7 @@ impl Tui {
         Ok(())
     }
 
-    fn kill_selected(&mut self) -> io::Result<()> {
+    async fn kill_selected(&mut self) -> io::Result<()> {
         self.confirm = false;
 
         if self.ports.is_empty() {
@@ -227,7 +227,7 @@ impl Tui {
                 })
             })?;
         }
-        self.refresh_ports()
+        self.refresh_ports().await
     }
 
     fn select_next(&mut self) {
@@ -252,8 +252,8 @@ impl Tui {
         self.exit = true;
     }
 
-    fn refresh_ports(&mut self) -> io::Result<()> {
-        self.ports = self.netstat.get_ports(&self.proto)?;
+    async fn refresh_ports(&mut self) -> io::Result<()> {
+        self.ports = self.netstat.get_ports(&self.proto).await?;
         self.selected = self.selected.min(self.ports.len().saturating_sub(1));
         Ok(())
     }

@@ -1,3 +1,4 @@
+use async_trait::async_trait;
 use bitflags::bitflags;
 use std::{env, fmt::Display, io, net::SocketAddr, str::FromStr};
 use tabled::Tabled;
@@ -57,8 +58,9 @@ pub struct NetStatEntry {
     pub proto: Protocol,
 }
 
+#[async_trait]
 pub trait NetStat {
-    fn get_ports(&self, protos: &Protocol) -> io::Result<Vec<NetStatEntry>>;
+    async fn get_ports(&self, protos: &Protocol) -> io::Result<Vec<NetStatEntry>>;
 }
 
 pub fn get_netstat_impl() -> Box<dyn NetStat> {
